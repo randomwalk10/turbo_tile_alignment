@@ -98,12 +98,18 @@ def featureMatch(img1, img2, filedir):
     orb = cv2.ORB_create()
     kp1, des1 = orb.detectAndCompute(img1, None)
     kp2, des2 = orb.detectAndCompute(img2, None)
+    # star = cv2.xfeatures2d.StarDetector_create()
+    # kp1 = star.detect(img1, None)
+    # kp2 = star.detect(img2, None)
+    # brief = cv2.xfeatures2d.BriefDescriptorExtractor_create()
+    # kp1, des1 = brief.compute(img1, kp1)
+    # kp2, des2 = brief.compute(img2, kp2)
     # feature match
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     matches = bf.match(des1, des2)
     matches = sorted(matches, key=lambda x: x.distance)
     # draw matches
-    img3 = cv2.drawMatches(img1, kp1, img2, kp2, matches[:3], None, flags=2)
+    img3 = cv2.drawMatches(img1, kp1, img2, kp2, matches[:2], None, flags=2)
     cv2.imwrite(filedir+os.path.sep+"matches.bmp", img3)
     pass
 
