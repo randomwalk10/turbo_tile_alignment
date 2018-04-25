@@ -4,97 +4,30 @@ import os
 import random
 import time
 import numpy as np
+from utilities import getTileInfo, rectangle
 
 
 CYCLE_LEN = (1 << 30)
 
 
-def getTileSize(scan_info_lines):
-    tile_num_index = 0
-    for i in range(len(scan_info_lines)):
-        if '[tile_size]' == scan_info_lines[i]:
-            tile_num_index = i + 1
-            break
-        pass
-    if tile_num_index == 0:
-        print("failed to find [tile_size]")
-        return
-    str_tile_width, str_tile_height = \
-        scan_info_lines[tile_num_index].split(',')
-    int_tile_width = int(str_tile_width)
-    int_tile_height = int(str_tile_height)
-    print("tile width %d height %d" % (int_tile_width, int_tile_height))
-    return int_tile_width, int_tile_height
-
-
-def getTileNum(scan_info_lines):
-    tile_num_index = 0
-    for i in range(len(scan_info_lines)):
-        if '[tile_num]' == scan_info_lines[i]:
-            tile_num_index = i + 1
-            break
-        pass
-    if tile_num_index == 0:
-        print("failed to find [tile_num]")
-        return
-    str_tile_cols, str_tile_rows = \
-        scan_info_lines[tile_num_index].split(',')
-    int_tile_cols = int(str_tile_cols)
-    int_tile_rows = int(str_tile_rows)
-    print("tile cols %d rows %d" % (int_tile_cols, int_tile_rows))
-    return int_tile_cols, int_tile_rows
-
-
-def getTilePos(scan_info_lines, tile_num):
-    tile_num_index = 0
-    for i in range(len(scan_info_lines)):
-        if '[tile_pos_scene_topleft]' == scan_info_lines[i]:
-            tile_num_index = i + 1
-            break
-        pass
-    if tile_num_index == 0:
-        print("failed to find [tile_pos_scene_topleft]")
-        return
-    tile_pos_dict = {}
-    for i in range(tile_num_index,
-                   tile_num_index+tile_num):
-        str_tile_index_x, str_tile_index_y, str_tile_pos_x, str_tile_pos_y = \
-            scan_info_lines[i].split(',')
-        tile_pos_dict[int(str_tile_index_x), int(str_tile_index_y)] = \
-            (float(str_tile_pos_x), float(str_tile_pos_y))
-        pass
-    return tile_pos_dict
-
-
-def getDataInfo(align_info_lines):
-    tile_num_index = 0
-    for i in range(len(align_info_lines)):
-        if '[tile_data_size]' == align_info_lines[i]:
-            tile_num_index = i + 1
-            break
-        pass
-    if tile_num_index == 0:
-        print("failed to find [tile_data_size]")
-        return
-    tile_data_dict = {}
-    while True:
-        if ('[' in align_info_lines[tile_num_index]) or \
-                (not align_info_lines[tile_num_index]):
-            break
-        str_tile_index_x, str_tile_index_y, str_pyramid_level, \
-            str_cycle_index, str_byte_pos, str_byte_size = \
-            align_info_lines[tile_num_index].split(',')
-        if int(str_pyramid_level) == 1:
-            tile_data_dict[int(str_tile_index_x), int(str_tile_index_y)] = \
-                (int(str_cycle_index), int(str_byte_pos), int(str_byte_size))
-            pass
-        tile_num_index += 1
-        pass
-    return tile_data_dict
-
-
-def featureMatch(img1, img2, filedir):
+def featureMatch(img1, img2, filedir, tile_width, tile_height,
+                 tl_pos_1, tl_pos_2):
     start_t = time.time()
+    # get intersect rect
+    rect1 = rectangle(tl_pos_1[0], tl_pos_1[1], tile_width, tile_height)
+    rect2 = rectangle(tl_pos_2[0], tl_pos_2[1], tile_width, tile_height)
+    overlap = rect1.interSect(rect2)
+    if not overlap:
+        print("img1 does not overlaps with img2")
+        return
+    img1 = img1[int(overlap._tl_y - rect1._tl_y):
+                int(overlap._height + overlap._tl_y - rect1._tl_y),
+                int(overlap._tl_x - rect1._tl_x):
+                int(overlap._width + overlap._tl_x - rect1._tl_x)]
+    img2 = img2[int(overlap._tl_y - rect2._tl_y):
+                int(overlap._height + overlap._tl_y - rect2._tl_y),
+                int(overlap._tl_x - rect2._tl_x):
+                int(overlap._width + overlap._tl_x - rect2._tl_x)]
     # detect keypoints
     # extract descriptor
     orb = cv2.ORB_create()
@@ -112,33 +45,8 @@ def featureMatch(img1, img2, filedir):
     pass
 
 
-def single_pair_test(filedir='', pair=[]):
-    """TODO: Docstring for single_pair_test.
-
-    :filedir: must not be empty
-    :pair: if empty, randomly select a pair
-    :returns: None
-
-    """
-    # read image files from disk
-    try:
-        scan_info_file = open(filedir+os.path.sep+'scan_info_0.txt', 'r')
-        pass
-    except IOError as e:
-        raise e
-    scan_info_lines = scan_info_file.read().splitlines()
-    scan_info_file.close()
-    tile_width, tile_height = getTileSize(scan_info_lines)
-    tile_cols, tile_rows = getTileNum(scan_info_lines)
-    tile_pos_dict = getTilePos(scan_info_lines, tile_cols*tile_rows)
-    try:
-        align_info_file = open(filedir+os.path.sep+'alignment_info_0.txt', 'r')
-    except IOError as e:
-        raise e
-    align_info_lines = align_info_file.read().splitlines()
-    align_info_file.close()
-    tile_data_dict = getDataInfo(align_info_lines)
-
+def getImageData(filedir='', pair=[], tile_cols=0, tile_rows=0,
+                 tile_pos_dict={}, tile_data_dict={}):
     if pair:
         first_pair_x = pair[0][0]
         first_pair_y = pair[0][1]
@@ -159,6 +67,7 @@ def single_pair_test(filedir='', pair=[]):
         pass
     tl_pos_x, tl_pos_y = \
         tile_pos_dict[first_pair_x, first_pair_y]
+    first_tl_pos = (tl_pos_x, tl_pos_y)
     cycle_index, byte_pos, byte_size = \
         tile_data_dict[first_pair_x, first_pair_y]
     print("tile[%d, %d] with tile pos[%f, %f] and data info[%d, %d, %d]" %
@@ -166,6 +75,7 @@ def single_pair_test(filedir='', pair=[]):
            cycle_index, byte_pos, byte_size))
     tl_pos_x, tl_pos_y = \
         tile_pos_dict[second_pair_x, second_pair_y]
+    second_tl_pos = (tl_pos_x, tl_pos_y)
     cycle_index, byte_pos, byte_size = \
         tile_data_dict[second_pair_x, second_pair_y]
     print("tile[%d, %d] with tile pos[%f, %f] and data info[%d, %d, %d]" %
@@ -187,8 +97,30 @@ def single_pair_test(filedir='', pair=[]):
     img2 = cv2.imdecode(np.fromstring(jpeg_data, dtype=np.uint8),
                         cv2.IMREAD_UNCHANGED)
     image_bin.close()
+    return img1, img2, first_tl_pos, second_tl_pos
+    pass
+
+
+def single_pair_test(filedir='', pair=[]):
+    """TODO: Docstring for single_pair_test.
+
+    :filedir: must not be empty
+    :pair: if empty, randomly select a pair
+    :returns: None
+
+    """
+    # read image files from disk
+    tile_width, tile_height, tile_cols, tile_rows, \
+        tile_pos_dict, tile_data_dict = \
+        getTileInfo(filedir)
+    # read image data
+    img1, img2, tl_pos_1, tl_pos_2 = getImageData(filedir, pair,
+                                                  tile_cols, tile_rows,
+                                                  tile_pos_dict,
+                                                  tile_data_dict)
     # perform feature matching
-    featureMatch(img1, img2, filedir)
+    featureMatch(img1, img2, filedir, tile_width, tile_height,
+                 tl_pos_1, tl_pos_2)
     pass
 
 
@@ -210,5 +142,6 @@ if __name__ == '__main__':
     else:
         print("input format should be filedir, first_pair_x, first_pair_y" +
               ", second_pair_x, second_pair_y")
+        print("or filedir")
         pass
     pass
