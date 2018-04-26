@@ -146,10 +146,10 @@ class rectangle(object):
         assert isinstance(other, rectangle)
         if (self._tl_x <= other._tl_x) and \
                 (self._tl_y <= other._tl_y) and \
-                (self._tl_x+self._tile_width >=
-                 other._tl_x+other._tile_width) and \
-                (self._tl_y+self._tile_height >=
-                 other._tl_y+other._tile_height):
+                (self._tl_x+self._width >=
+                 other._tl_x+other._width) and \
+                (self._tl_y+self._height >=
+                 other._tl_y+other._height):
             return True
         return False
 

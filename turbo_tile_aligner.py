@@ -2,6 +2,7 @@ import cv2
 import sys
 import os
 import time
+import math
 import numpy as np
 from shutil import copy2
 from utilities import getTileInfo, rectangle, CYCLE_LEN
@@ -120,7 +121,7 @@ class turbo_tile_aligner(object):
 
     def extractFeatures(self, x_index, y_index, orb):
         assert isinstance(orb, cv2.ORB)
-        output = (None, None, None, None)
+        output = [None, None, None, None]
         tile_list = [(x_index-1, y_index), (x_index, y_index-1),
                      (x_index+1, y_index), (x_index, y_index+1)]
         # get image data and rect
@@ -151,7 +152,7 @@ class turbo_tile_aligner(object):
                                int(overlap._tl_x - this_rect._tl_x):
                                int(overlap._tl_x + overlap._width -
                                    this_rect._tl_x)]
-                    kp, des = orb.detectAndCompute(crop)
+                    kp, des = orb.detectAndCompute(crop, None)
                     offset_x = int(overlap._tl_x - this_rect._tl_x)
                     offset_y = int(overlap._tl_y - this_rect._tl_y)
                     output[i] = featureObj(kp, des, offset_x, offset_y)
@@ -176,32 +177,47 @@ class turbo_tile_aligner(object):
                                        other_des[pair_idx]._descriptors)
                     if len(matches) >= 2:
                         matches = sorted(matches, key=lambda x: x.distance)
-                        other_tl_x = align_tile_dict[tile_list[i]][0]
-                        other_tl_y = align_tile_dict[tile_list[i]][1]
-                        new_tls = []
-                        for j in [0, 1]:
-                            kp1 = des_list[i]._keypoints[
-                                matches[j].queryIdx]
-                            kp2 = other_des[pair_idx]._keypoints[
-                                matches[j].trainIdx]
-                            new_tl_x = other_tl_x + kp2.pt.x + \
-                                other_des[pair_idx]._tl_x - \
-                                (kp1.pt.x + des_list[i]._tl_x)
-                            new_tl_y = other_tl_y + kp2.pt.y + \
-                                other_des[pair_idx]._tl_y - \
-                                (kp1.pt.y + des_list[i]._tl_y)
-                            new_tls.append((new_tl_x, new_tl_y))
+                        # check if two points are spacially distinguishable
+                        # if yes, continue
+                        kp1 = des_list[i]._keypoints[
+                            matches[0].queryIdx]
+                        kp2 = des_list[i]._keypoints[
+                            matches[1].queryIdx]
+                        dist = math.sqrt((kp1.pt[0]-kp2.pt[0])**2 +
+                                         (kp1.pt[1]-kp2.pt[1])**2)
+                        if dist > 32:
+                            # compute the new tl positions
+                            other_tl_x = align_tile_dict[tile_list[i]]._tl_x
+                            other_tl_y = align_tile_dict[tile_list[i]]._tl_y
+                            new_tls = []
+                            for j in [0, 1]:
+                                kp1 = des_list[i]._keypoints[
+                                    matches[j].queryIdx]
+                                kp2 = other_des[pair_idx]._keypoints[
+                                    matches[j].trainIdx]
+                                new_tl_x = other_tl_x + kp2.pt[0] + \
+                                    other_des[pair_idx]._tl_x - \
+                                    (kp1.pt[0] + des_list[i]._tl_x)
+                                new_tl_y = other_tl_y + kp2.pt[1] + \
+                                    other_des[pair_idx]._tl_y - \
+                                    (kp1.pt[1] + des_list[i]._tl_y)
+                                new_tls.append((new_tl_x, new_tl_y))
+                                pass
+                            # if two candidates are spacially close, return
+                            # the average of them
+                            if abs(new_tls[0][0] - new_tls[1][0]) < 2. and \
+                                    abs(new_tls[0][1] - new_tls[1][1]) < 2.:
+                                self._time_elapsed += time.time() - temp_t
+                                return True, \
+                                    (new_tls[0][0] + new_tls[1][0]) / 2., \
+                                    (new_tls[0][1] + new_tls[1][1]) / 2.
                             pass
-                        if abs(new_tls[0][0] - new_tls[1][0]) < 2. and \
-                                abs(new_tls[0][1] - new_tls[1][1]) < 2.:
-                            self._time_elapsed += time.time() - temp_t
-                            return True, (new_tls[0][0] + new_tls[1][0]) / 2. \
-                                (new_tls[0][1] + new_tls[1][1]) / 2.
                         pass
                 pass
             pass
         self._time_elapsed += time.time() - temp_t
-        return False, 0., 0.
+        tl_x, tl_y = self._tile_pos_dict[x_index, y_index]
+        return False, tl_x, tl_y
 
     def performAlignment(self, isZigZag=False, resize_tile_dict={}):
         align_tile_dict = {}
@@ -224,9 +240,6 @@ class turbo_tile_aligner(object):
                                       tile_des_dict, bf)
                 # adjust tile position
                 tile_des_dict[x_index, y_index] = des_list
-                if not isMatch:
-                    new_tl_x, new_tl_y = self._tile_pos_dict[x_index, y_index]
-                    pass
                 align_tile_dict[x_index, y_index] = \
                     rectangle(new_tl_x, new_tl_y,
                               self._tile_width,
@@ -240,9 +253,8 @@ class turbo_tile_aligner(object):
                 align_rect = align_tile_dict[x_index, y_index]
                 resize_rect = resize_tile_dict[x_index, y_index]
                 if not align_rect.contains(resize_rect):
-                    print("Error: alignment is out of range at tile[%d, %d]"
-                          % (x_index, y_index))
-                    return
+                    raise NameError("alignment is out of range at " +
+                                    "tile[%d, %d]" % (x_index, y_index))
                 pass
             pass
         return align_tile_dict
@@ -252,15 +264,25 @@ class turbo_tile_aligner(object):
         if not os.path.exists(outdir):
             os.makedirs(outdir)
             pass
-        copy_file_list = ["scan_info_0.txt", "preview.bmp",
-                          "out_for_web.txt", "Label.bmp",
-                          "alignment_data_0.bin"]
+        # copy image data to outdir
+        copy_file_list = ["preview.bmp", "Label.bmp", "alignment_data_0.bin"]
         for file2copy in copy_file_list:
             file_path = self._filedir+os.path.sep+file2copy
             if not os.path.exists(outdir+os.path.sep+file2copy):
                 copy2(file_path, outdir)
                 pass
             pass
+        # copy scan info to outdir(eliminate '\r' at end of line)
+        scan_file = open(self._filedir + os.path.sep +
+                         "scan_info_0.txt", 'r')
+        scan_info_lines = scan_file.read().splitlines()
+        scan_file.close()
+        scan_file = open(outdir+os.path.sep+"scan_info_0.txt", 'w')
+        for i in range(len(scan_info_lines)):
+            scan_file.write(scan_info_lines[i]+'\n')
+            pass
+        scan_file.close()
+        # generate align info to outdir
         align_file = open(self._filedir + os.path.sep +
                           "alignment_info_0.txt", 'r')
         align_info_lines = align_file.read().splitlines()
@@ -328,12 +350,12 @@ class turbo_tile_aligner(object):
 
 
 if __name__ == '__main__':
-    if(len(sys.argv == 2)):
+    if(len(sys.argv) == 2):
         filedir = sys.argv[1]
         aligner = turbo_tile_aligner(filedir)
         aligner.run()
         pass
-    elif(len(sys.argv == 3)):
+    elif(len(sys.argv) == 3):
         filedir = sys.argv[1]
         isZigZag = bool(int(sys.argv[2]))
         aligner = turbo_tile_aligner(filedir)
