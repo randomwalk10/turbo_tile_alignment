@@ -1,5 +1,7 @@
 import os
 
+CYCLE_LEN = (1 << 30)
+
 
 def getTileSize(scan_info_lines):
     tile_num_index = 0
@@ -139,3 +141,34 @@ class rectangle(object):
                              new_br_x - new_tl_x,
                              new_br_y - new_tl_y)
         return None
+
+    def contains(self, other):
+        assert isinstance(other, rectangle)
+        if (self._tl_x <= other._tl_x) and \
+                (self._tl_y <= other._tl_y) and \
+                (self._tl_x+self._tile_width >=
+                 other._tl_x+other._tile_width) and \
+                (self._tl_y+self._tile_height >=
+                 other._tl_y+other._tile_height):
+            return True
+        return False
+
+
+class featureObj(object):
+
+    """Docstring for featureObj. """
+
+    def __init__(self, keypoints, descriptors, tl_x, tl_y):
+        """TODO: to be defined1.
+
+        :keypoints: TODO
+        :descriptors: TODO
+        :tl_x: TODO
+        :tl_y: TODO
+
+        """
+        self._keypoints = keypoints
+        self._descriptors = descriptors
+        self._tl_x = tl_x
+        self._tl_y = tl_y
+        pass

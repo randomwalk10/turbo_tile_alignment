@@ -4,10 +4,7 @@ import os
 import random
 import time
 import numpy as np
-from utilities import getTileInfo, rectangle
-
-
-CYCLE_LEN = (1 << 30)
+from utilities import getTileInfo, rectangle, CYCLE_LEN
 
 
 def featureMatch(img1, img2, filedir, tile_width, tile_height,
@@ -39,7 +36,8 @@ def featureMatch(img1, img2, filedir, tile_width, tile_height,
     matches = sorted(matches, key=lambda x: x.distance)
     # draw matches
     end_t = time.time()
-    img3 = cv2.drawMatches(img1, kp1, img2, kp2, matches[:2], None, flags=2)
+    img3 = cv2.drawMatches(img1, kp1, img2, kp2, matches[:2], None,
+                           matchColor=(0, 255, 0), flags=2)
     cv2.imwrite(filedir+os.path.sep+"matches.bmp", img3)
     print("time elapsed for feature matching %f seconds" % (end_t - start_t))
     pass
