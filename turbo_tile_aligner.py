@@ -219,7 +219,8 @@ class turbo_tile_aligner(object):
         tl_x, tl_y = self._tile_pos_dict[x_index, y_index]
         return False, tl_x, tl_y
 
-    def performAlignment(self, isZigZag=False, resize_tile_dict={}):
+    def performAlignment(self, isZigZag=False, useAlign=True,
+                         resize_tile_dict={}):
         align_tile_dict = {}
         tile_des_dict = {}
         orb = cv2.ORB_create()
@@ -231,15 +232,20 @@ class turbo_tile_aligner(object):
                 if isZigZag and (0 == x_index % 2):
                     y_index = self._tile_rows-j
                     pass
-                # detect keypoints and compute descriptors
-                des_list = self.extractFeatures(x_index, y_index, orb)
-                # match features against neighbors
-                isMatch, new_tl_x, new_tl_y = \
-                    self.featureMatch(x_index, y_index,
-                                      des_list, align_tile_dict,
-                                      tile_des_dict, bf)
+                isMatch = False
+                new_tl_x, new_tl_y = self._tile_pos_dict[x_index, y_index]
+                if useAlign:
+                    # detect keypoints and compute descriptors
+                    des_list = self.extractFeatures(x_index, y_index, orb)
+                    # match features against neighbors
+                    isMatch, new_tl_x, new_tl_y = \
+                        self.featureMatch(x_index, y_index,
+                                          des_list, align_tile_dict,
+                                          tile_des_dict, bf)
+                    # update tile_des_dict
+                    tile_des_dict[x_index, y_index] = des_list
+                    pass
                 # adjust tile position
-                tile_des_dict[x_index, y_index] = des_list
                 align_tile_dict[x_index, y_index] = \
                     rectangle(new_tl_x, new_tl_y,
                               self._tile_width,
@@ -298,37 +304,28 @@ class turbo_tile_aligner(object):
             y_index = j + 1
             for i in range(self._tile_cols):
                 x_index = i + 1
-                out_array = []
                 rect = align_tile_dict[x_index, y_index]
-                out_array.append(x_index)
-                out_array.append(y_index)
-                out_array.append(rect._tl_x)
-                out_array.append(rect._tl_y)
-                align_file.write(','.join(str(a) for a in out_array) + '\n')
+                align_file.write("%d,%d,%.1f,%.1f\n" %
+                                 (x_index, y_index, rect._tl_x, rect._tl_y))
                 pass
             pass
         align_file.write('[resize_tile_pos_scene_topleft]'+'\n')
+        total_tile_num = self._tile_rows * self._tile_cols
         for j in range(self._tile_rows):
             y_index = j + 1
             for i in range(self._tile_cols):
                 x_index = i + 1
-                out_array = []
                 rect = resize_tile_dict[x_index, y_index]
-                out_array.append(x_index)
-                out_array.append(y_index)
-                out_array.append(rect._tl_x)
-                out_array.append(rect._tl_y)
-                out_array.append(1)
-                out_array.append(self._tile_rows*self._tile_cols)
-                out_array.append(rect._width)
-                out_array.append(rect._height)
-                align_file.write(','.join(str(a) for a in out_array) + '\n')
+                align_file.write("%d,%d,%.1f,%.1f,%d,%d,%d,%d\n" %
+                                 (x_index, y_index, rect._tl_x, rect._tl_y,
+                                  1, total_tile_num,
+                                  rect._width, rect._height))
                 pass
             pass
         align_file.close()
         pass
 
-    def run(self, isZigZag=False):
+    def run(self, isZigZag=False, useAlign=True):
         # reset time elapsed
         self._time_elapsed = 0.
         start_t = time.time()
@@ -337,7 +334,8 @@ class turbo_tile_aligner(object):
         # pre-alignment resizing
         resize_tile_dict = self.getResizeTileDict()
         # align tiles
-        align_tile_dict = self.performAlignment(isZigZag, resize_tile_dict)
+        align_tile_dict = self.performAlignment(isZigZag, useAlign,
+                                                resize_tile_dict)
         # output alignment info to outdir
         self.outputInfo(resize_tile_dict, align_tile_dict)
         # output total time elapsed
@@ -350,20 +348,15 @@ class turbo_tile_aligner(object):
 
 
 if __name__ == '__main__':
-    if(len(sys.argv) == 2):
-        filedir = sys.argv[1]
-        aligner = turbo_tile_aligner(filedir)
-        aligner.run()
-        pass
-    elif(len(sys.argv) == 3):
+    if(len(sys.argv) == 4):
         filedir = sys.argv[1]
         isZigZag = bool(int(sys.argv[2]))
+        useAlign = bool(int(sys.argv[3]))
         aligner = turbo_tile_aligner(filedir)
-        aligner.run(isZigZag)
+        aligner.run(isZigZag, useAlign)
         pass
     else:
         print("input format should be: " +
-              "python turbo_tile_aligner.py <filedir>" +
-              "or python turbo_tile_aligner.py <filedir> <useZigZag>")
+              "python turbo_tile_aligner.py <filedir> <useZigZag> <useAlign>")
         pass
     pass
