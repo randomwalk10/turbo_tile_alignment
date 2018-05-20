@@ -11,8 +11,7 @@ def getTileSize(scan_info_lines):
             break
         pass
     if tile_num_index == 0:
-        print("failed to find [tile_size]")
-        return
+        raise NameError("failed to find [tile_size]")
     str_tile_width, str_tile_height = \
         scan_info_lines[tile_num_index].split(',')
     int_tile_width = int(str_tile_width)
@@ -29,8 +28,7 @@ def getTileNum(scan_info_lines):
             break
         pass
     if tile_num_index == 0:
-        print("failed to find [tile_num]")
-        return
+        raise NameError("failed to find [tile_num]")
     str_tile_cols, str_tile_rows = \
         scan_info_lines[tile_num_index].split(',')
     int_tile_cols = int(str_tile_cols)
@@ -47,8 +45,7 @@ def getTilePos(scan_info_lines, tile_num):
             break
         pass
     if tile_num_index == 0:
-        print("failed to find [tile_pos_scene_topleft]")
-        return
+        raise NameError("failed to find [tile_pos_scene_topleft]")
     tile_pos_dict = {}
     for i in range(tile_num_index,
                    tile_num_index+tile_num):
@@ -68,8 +65,7 @@ def getDataInfo(align_info_lines):
             break
         pass
     if tile_num_index == 0:
-        print("failed to find [tile_data_size]")
-        return
+        raise NameError("failed to find [tile_data_size]")
     tile_data_dict = {}
     while True:
         if ('[' in align_info_lines[tile_num_index]) or \
