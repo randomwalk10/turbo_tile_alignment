@@ -43,4 +43,4 @@ typical example:
 
 	python turbo_tile_aligner.py ./data 1 1
 
-A copy of unaligned image data could be download [Here](http://gofile.me/2wSDC/7tsqehqio)
+A copy of unaligned image data could be downloaded [Here](https://drive.google.com/drive/folders/1u7hxsuSNjXtwzQVCzkR68zRcWwTgIKi0?usp=sharing)
