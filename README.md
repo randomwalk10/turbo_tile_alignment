@@ -2,8 +2,8 @@ README
 
 This is an example of python simulator that sequentially takes in misaligned image tiles(2048x2048)
 obtained by whole slide imager(WSI) and generate the new alignment position for each tile in real-time
-fashion. What we mean 'misaligned' here is that although camera is triggered by stage positioning to
-acquire image tiles there could be up to 10 pixels(0.45um per pixel) position misalignment due to a
+during tissue scanning. What we mean 'misaligned' here is that although camera is triggered by stage positioning to
+acquire image tiles there could be up to 50 pixels(0.45um per pixel) position misalignment due to a
 variety of reasons including mechanical disturbance, latencies in camera capturing, camera calibration
 errors, etc.
 
@@ -42,3 +42,5 @@ How to run the code:
 typical example:
 
 	python turbo_tile_aligner.py ./data 1 1
+
+A copy of unaligned image data could be download [Here](http://gofile.me/2wSDC/7tsqehqio)
